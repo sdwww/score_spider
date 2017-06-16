@@ -82,18 +82,33 @@ def build_path(school_dict, province_dict):
 def create_threads(thread_count, session, lock, path, head):
     threads = []
     for i in range(thread_count):
-        course_thread = ScoreThread(name=i, session=session, lock=lock, path=path, head=head)
-        course_thread.start()
-        threads.append(course_thread)
+        score_thread = ScoreThread(name=i, session=session, lock=lock, path=path, head=head)
+        score_thread.start()
+        threads.append(score_thread)
     for thread in threads:
         thread.join()
 
-# #读取错误文件
-# def read_error_log():
+
+# 读取错误文件
+def read_error_log():
+    error_log = []
+    file_object = open('.\log\error.txt', 'r+', encoding='utf-8')
+    try:
+        all_the_text = file_object.readlines()
+        for i in all_the_text:
+            items = i.replace('\n', '').split(' ')
+            error_log.append(items)
+    finally:
+        file_object.close()
+        file_object = open('.\log\error.txt', 'r+', encoding='utf-8')
+        file_object.truncate()
+        file_object.close()
+    return error_log
+
 
 if __name__ == "__main__":
     start = time.clock()
-    course_session = requests.session()
+    score_session = requests.session()
     # 构造headers
     agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' \
             '(KHTML, like Gecko) Chrome/59.0.3071.86 Safari/537.36'
@@ -102,10 +117,15 @@ if __name__ == "__main__":
         'User-Agent': agent
     }
 
-    school_info = get_school_dict(course_session, headers)
+    school_info = get_school_dict(score_session, headers)
     province_info = get_province_dict()
     complete_path = build_path(school_info, province_info)
-    #
-    course_lock = threading.RLock()
-    create_threads(thread_count=1, session=course_session, lock=course_lock, path=complete_path, head=headers)
+    # #
+    # score_lock = threading.RLock()
+    # create_threads(thread_count=1, session=score_session, lock=score_lock, path=complete_path, head=headers)
+    error_list = read_error_log()
+    while len(error_list):
+        score_lock = threading.RLock()
+        create_threads(thread_count=1, session=score_session, lock=score_lock, path=error_list, head=headers)
+        error_list = read_error_log()
     print('总时间为:', time.clock() - start)
