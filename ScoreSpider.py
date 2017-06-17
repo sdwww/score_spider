@@ -1,9 +1,11 @@
 import os
 import re
-import threading
 import time
 
 import requests
+from bs4 import BeautifulSoup
+from openpyxl import Workbook
+from openpyxl import load_workbook
 
 from ScoreThread import ScoreThread
 
@@ -106,6 +108,51 @@ def read_error_log():
     return error_log
 
 
+def parser_html(path):
+    # wb = load_workbook(filename='./data_xlsx/SPM_COUNT.xlsx')
+    # sheetnames = wb.get_sheet_names()
+    # ws = wb.get_sheet_by_name(sheetnames[0])
+    # delete_count = 0
+    # ws.cell(column=4, row=rx, value=spm_drug_dict[i])
+    # wb.save('./data_xlsx/SPM_COUNT.xlsx')
+    try:
+        if not os.path.isdir('./saved_excel/'):
+            os.mkdir('./saved_excel/')
+    except FileExistsError:
+        pass
+    for i in path:
+        try:
+            if not os.path.isdir('./saved_excel/' + i[0] + '/'):
+                os.mkdir('./saved_excel/' + i[0] + '/')
+            if not os.path.exists('./saved_excel/' + i[0] + '/' + i[0] + i[1] + '.xlsx'):
+                wb = Workbook()
+                ws = wb.active
+                ws.append(['学校', '专业名称', '年份', '最高分', '平均分', '最低分', '录取批次'])
+                wb.save('./saved_excel/' + i[0] + '/' + i[0] + i[1] + '.xlsx')
+        except FileExistsError:
+            pass
+        soup = BeautifulSoup(open('./saved_html/' + i[0] + '/' + i[1] + '/' + i[2] + '.html',
+                                  encoding="utf-8"), "lxml")
+        all_row = soup.find('table').find('tbody').find_all('tr')
+        wb = load_workbook('./saved_excel/' + i[0] + '/' + i[0] + i[1] + '.xlsx')
+        is_null = False
+        for one_row in all_row:
+            row_value = [i[2][0:-4]]
+            for item in one_row.find_all('td'):
+                if item.string.replace('\t', '').replace(' ', '').replace('\n', '') == '暂时没有数据':
+                    is_null = True
+                else:
+                    row_value.append(item.string.replace('\t', '').replace(' ', '').replace('\n', ''))
+            if is_null:
+                break
+            sheetnames = wb.get_sheet_names()
+            ws = wb.get_sheet_by_name(sheetnames[0])
+            ws.append(row_value)
+        wb.save('./saved_excel/' + i[0] + '/' + i[0] + i[1] + '.xlsx')
+        if not is_null:
+            print('保存./saved_html/' + i[0] + '/' + i[1] + '/' + i[2] + '.html成功！')
+
+
 if __name__ == "__main__":
     start = time.clock()
     score_session = requests.session()
@@ -120,12 +167,13 @@ if __name__ == "__main__":
     school_info = get_school_dict(score_session, headers)
     province_info = get_province_dict()
     complete_path = build_path(school_info, province_info)
-    # #
+
     # score_lock = threading.RLock()
     # create_threads(thread_count=1, session=score_session, lock=score_lock, path=complete_path, head=headers)
-    error_list = read_error_log()
-    while len(error_list):
-        score_lock = threading.RLock()
-        create_threads(thread_count=1, session=score_session, lock=score_lock, path=error_list, head=headers)
-        error_list = read_error_log()
+    # error_list = read_error_log()
+    # while len(error_list):
+    #     score_lock = threading.RLock()
+    #     create_threads(thread_count=1, session=score_session, lock=score_lock, path=error_list, head=headers)
+    #     error_list = read_error_log()
+    parser_html(complete_path)
     print('总时间为:', time.clock() - start)
